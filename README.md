@@ -8,11 +8,21 @@ go并发主要有两个方向：channel、并发原语
 ### mutex
 - 使用 demo.go
 - 竞态分析
-  
-  go run -race xx.go
-  
-  go tool compile -race -S xx.go
-
+  - go run -race xx.go
+  - go tool compile -race -S xx.go
+- vet静态代码检查，go vet xx.go，可以检查出死锁
+- 第三方的死锁检测工具
+  - go-deadlock (https://github.com/sasha-s/go-deadlock)
+  - go-tools (https://github.com/dominikh/go-tools)
+- 常见的4种错误场景
+  - Lock/Unlock不是成对出现
+  - Copy已使用的mutex
+  - mutex不是可重入锁
+  - 死锁
+- 扩展功能
+  - TryLock
+  - 等待者的数量
+  - 线程安全的队列
 
 ### RWMutex
 
