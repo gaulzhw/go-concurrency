@@ -28,7 +28,7 @@ go并发主要有两个方向：channel、并发原语
   - 等待者的数量
   - 线程安全的队列
 
-![state](images/state.jpg)
+![state](images/mutex_state.jpg)
 
 ```go
 type Mutex struct {
@@ -82,6 +82,8 @@ const rwmutexMaxReaders = 1 << 30
 
 
 ### WaitGroup
+
+解决 并发-等待 问题
 
 
 
