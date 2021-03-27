@@ -141,7 +141,90 @@ Once可以用来执行且仅仅执行一次动作，常常用于单例对象的�
 
 
 
-### map for thread safe
+### map & sync.Map
+
+并发map更高效的使用方式：分片+加锁（尽量减少锁的粒度和锁的持有时间）
+
+- map的常见错误
+  - 未初始化
+  - 并发读写
+
+https://github.com/elliotchance/orderedmap
+
+https://github.com/orcaman/concurrent-map
+
+```go
+var SHARD_COUNT = 32 
+
+// 分成SHARD_COUNT个分片的
+map type ConcurrentMap []*ConcurrentMapShared
+
+// 通过RWMutex保护的线程安全的分片，包含一个map
+type ConcurrentMapShared struct {
+  items map[string]interface{}
+  sync.RWMutex
+  // Read Write mutex, guards access to internal map.
+}
+
+// 创建并发map
+func New() ConcurrentMap {
+  m := make(ConcurrentMap, SHARD_COUNT)
+  for i := 0; i < SHARD_COUNT; i++ {
+    m[i] = &ConcurrentMapShared{items: make(map[string]interface{})}
+  }
+  return m
+}
+
+// 根据key计算分片索引
+func (m ConcurrentMap) GetShard(key string) *ConcurrentMapShared {
+  return m[uint(fnv32(key))%uint(SHARD_COUNT)]
+}
+```
+
+- sync.Map使用场景
+  - 只会增长的缓存系统中，一个key只写入一次而被读很多次
+  - 多个goroutine为不相交的键集读、写和重写键值对
+
+- sync.Map实现有几个优化点
+  - 空间换时间，通过冗余的两个数据结构（只读的read、可写的dirty）来减少加锁对性能的影响，对只读字段的操作不需要加锁
+  - 优先从read字段读取、更新、删除，因为对read字段的读取不需要锁
+  - 动态调整，miss次数多了之后，将dirty数据提升为read，避免总是从dirty中加锁读取
+  - double-checking，加锁之后先还要再检查read字段，确定真的不存在才操作diryt字段
+  - 延迟删除，删除一个键值只是打标记，只有在提升dirty字段为read字段的时候才清理删除的数据
+
+```go
+type Map struct {
+  mu Mutex
+  // 基本上你可以把它看成一个安全的只读的map
+  // 它包含的元素其实也是通过原子操作更新的，但是已删除的entry就需要加锁操作了
+  read atomic.Value // readOnly
+  
+  // 包含需要加锁才能访问的元素
+  // 包括所有在read字段中但未被expunged（删除）的元素以及新加的元素
+  dirty map[interface{}]*entry
+  
+  // 记录从read中读取miss的次数，一旦miss数和dirty长度一样了，就会把dirty提升为read，并把dirty置空
+  misses int
+}
+
+type readOnly struct {
+  m map[interface{}]*entry
+  amended bool // 当dirty中包含read没有的数据时为true，比如新增一条数据
+}
+
+// expunged是用来标识此项已经删掉的指针
+// 当map中的一个项目被删除了，只是把它的值标记为expunged，以后才有机会真正删除此项
+var expunged = unsafe.Pointer(new(interface{}))
+
+// entry代表一个值
+type entry struct {
+  p unsafe.Pointer // *interface{}
+}
+```
+
+https://github.com/zekroTJA/timedmap
+
+https://godoc.org/github.com/emirpasic/gods/maps/treemap
 
 
 
