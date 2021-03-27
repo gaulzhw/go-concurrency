@@ -280,6 +280,14 @@ https://godoc.org/github.com/emirpasic/gods/maps/treemap
 
 ## atomic
 
+适用场景：不涉及到对资源复杂的竞争逻辑，只是会并发地读写这个标志
+
+https://github.com/uber-go/atomic
+
+atomic包提供的方法会提供内存屏障的功能，所以atomic不仅仅可以保证赋值的数据完整性，还能保证数据的可见性，一旦一个核更新了该地址的值，其他处理器总是能读取到它的最新值。但是，因为需要处理器之间保证数据的一致性，atomic的操作也是会降低性能的。
+
+https://github.com/golang/go/issues/39351
+
 
 
 ## channel
@@ -304,3 +312,7 @@ https://godoc.org/github.com/emirpasic/gods/maps/treemap
 ## Ref
 
 [64位对齐](https://go101.org/article/memory-layout.html)
+
+[Atomic vs. Non-Atomic Operations](https://preshing.com/20130618/atomic-vs-non-atomic-operations/)
+
+[Lockless Programming Considerations for Xbox 360 and Microsoft Windows](https://docs.microsoft.com/zh-cn/windows/win32/dxtecharts/lockless-programming)
