@@ -230,6 +230,42 @@ https://godoc.org/github.com/emirpasic/gods/maps/treemap
 
 ### Pool
 
+用来保存一组可独立访问的临时对象，它池化的对象会在未来的某个时候被毫无征兆地移除掉，如果没有别的对象引用这个被移除的对象的话，这个被移除的对象会被垃圾回收掉
+
+- sync.Pool本身就是线程安全的，多个goroutine可以并发地调用它的方法存取对象
+- sync.Pool不可在使用之后再复制使用
+
+- sync.Pool的坑
+  - 内存泄漏
+  - 内存浪费
+
+第三方库
+
+- bytebufferpool https://github.com/valyala/bytebufferpool
+- bpool https://github.com/oxtoacart/bpool
+
+更多池化场景
+
+- 连接池
+- http client池
+- tcp连接池 https://github.com/fatih/pool
+- 数据库连接池
+- memcached client连接池 https://github.com/bradfitz/gomemcache
+- worker pool
+  - 大部分的worker pool都是通过Channel来缓存任务的，因为Channel能够比较方便地实现并发的保护
+  - 有的是多个Worker共享同一个任务Channel
+  - 有些每个Worker都有一个独立的Channel
+  - https://github.com/valyala/fasthttp/blob/9f11af296864153ee45341d3f2fe0f5178fd6210/workerpool.go#L16
+  - https://godoc.org/github.com/gammazero/workerpool 可以无限制地提交任务，提供了更便利的 Submit 和 SubmitWait 方法提交任务，还可以提供当前的 worker 数和任务数以及关闭 Pool 的功能
+  - https://godoc.org/github.com/ivpusic/grpool 创建 Pool 的时候需要提供 Worker 的数量和等待执行的任务的最大数量，任务的提交是直接往 Channel 放入任务
+  - https://pkg.go.dev/github.com/dpaks/goworkers 提供了更便利的 Submit 方法提交任务以及 Worker 数、任务数等查询方法、关闭 Pool 的方法。它的任务的执行结果需要在 ResultChan 和 ErrChan 中去获取，没有提供阻塞的方法，但是它可以在初始化的时候设置 Worker 的数量和任务数
+  - https://github.com/panjf2000/ants
+  - https://github.com/Jeffail/tunny
+  - https://github.com/benmanns/goworker
+  - https://github.com/go-playground/pool
+  - https://github.com/Sherifabdlnaby/gpool
+  - https://github.com/alitto/pond
+
 
 
 ### Context
