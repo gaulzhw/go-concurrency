@@ -270,6 +270,12 @@ https://godoc.org/github.com/emirpasic/gods/maps/treemap
 
 ### Context
 
+- 常用场景
+  - 上下文信息传递，比如处理http请求、在请求处理链路上传递信息
+  - 控制子goroutine的运行
+  - 超时控制的方法调用
+  - 可以取消的方法调用
+
 
 
 ## atomic
