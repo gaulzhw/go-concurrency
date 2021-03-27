@@ -18,7 +18,7 @@ go并发主要有两个方向：channel、并发原语
 - 第三方的死锁检测工具
   - go-deadlock (https://github.com/sasha-s/go-deadlock)
   - go-tools (https://github.com/dominikh/go-tools)
-- 常见的4种错误场景
+- 常见错误场景
   - Lock/Unlock不是成对出现
   - Copy已使用的mutex
   - mutex不是可重入锁
@@ -59,7 +59,7 @@ const (
   - Read-preferring：读优先的设计可以提供很高的并发性，但是在竞争激烈的情况下可能会导致写饥饿
   - Write-preferring：写优先的设计意味着如果已经有一个writer在等待请求锁的话，它会阻止新来的请求锁的reader获取到锁，所以优先保障writer
   - 不指定优先级：不区分reader和writer优先级
-- 常见的3种错误场景
+- 常见错误场景
   - 不可复制
   - 重入导致死锁（产生原因是Go的RWMutex是Write-preferring）
     - 读写锁因为重入（或递归调用）导致死锁
@@ -85,9 +85,49 @@ const rwmutexMaxReaders = 1 << 30
 
 解决 并发-等待 问题
 
+- 正确姿势
+  - 预先确定好WaitGroup的计数值，然后调用相同次数的Done完成相应的任务
+
+- 常见错误场景
+  - 计数器设置为负值，WaitGroup的计数器的值必须大于等于0
+    - 调用Add的时候传递一个负数
+    - 调用Done方法的次数过多，超过了WaitGroup的计数值
+  - 不期望的Add时机，原则：等所有的Add方法调用之后再调用Wait，否则可能导致panic或者不期望的结果
+  - 前一个Wait还没结束就重用WaitGroup
+
+```go
+type WaitGroup struct {
+  // 避免复制使用的一个技巧，可以告诉vet工具违反了复制使用的规则
+  noCopy noCopy
+  // 64bit(8bytes)的值分成两段，高32bit是计数值，低32bit是waiter的计数
+  // 另外32bit是用作信号量的
+  // 因为64bit值的原子操作需要64bit对齐，但是32bit编译器不支持，所以数组中的元素在不同的架构中不一样，具体处理看下面的方法
+  // 总之，会找到对齐的那64bit作为state，其余的32bit做信号量
+  state1 [3]uint32
+}
+```
+
 
 
 ### Cond
+
+为 等待/通知 场景下的并发问题提供支持
+
+在实践中，处理等待/通知的场景时，常常使用Channel替换Cond，因为Channel类型使用起来更简洁，而且不容易出错。但是对于需要重复调用Broadcast的场景，使用Cond就再合适不过了。
+
+调用Wait方法前必须要持有锁
+
+Signal、Broadcast不强求要持有锁
+
+- 常见错误场景
+  - 调用Wait的时候没有加锁
+  - 没有检查条件是否满足程序就继续执行
+
+Cond有三点特性是Channel无法替代的：
+
+- Cond和一个Locker关联，可以利用这个Locker对相关的依赖条件更改提供保护
+- Cond可以同时支持Signal和Broadcast方法，而Channel只能同时支持其中一个（Channel实现Broadcast可以通过close来实现）
+- Cond的Broadcast方法可以被重复调用。等待条件再次变成不满足的状态后，我们又可以调用Broadcast再次唤醒等待的goroutine。这也是Channel不能支持的，Channel被close掉之后不支持再open
 
 
 
@@ -116,6 +156,8 @@ const rwmutexMaxReaders = 1 << 30
 ### channel
 
 
+
+
 ### 内存模型
 
 
@@ -125,3 +167,9 @@ const rwmutexMaxReaders = 1 << 30
 
 
 ## 分布式并发原语
+
+
+
+## Ref
+
+[64位对齐](https://go101.org/article/memory-layout.html)
