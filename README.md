@@ -399,6 +399,35 @@ func doCleanup(closed chan struct{}) {
 
 ### 内存模型
 
+并发环境中多goroutine读相同变量的时候，变量的可见性条件。具体指，在什么条件下，goroutine在读取一个变量的值的时候，能够看到其他goroutine对这个变量进行的写的结果。
+
+CPU指令重排和多级Cache的存在，保证多核访问同一个变量变得非常复杂，不同CPU架构的处理方式也不一样，再加上编译器的优化也可能对指令进行重排，所以编程语言需要一个规范来明确多线程同时访问同一个变量的可见性和顺序。这个规范被叫做内存模型。http://nil.csail.mit.edu/6.824/2016/notes/gomem.pdf
+
+happens-before：在一个goroutine内部，程序的执行顺序和它们的代码指定的顺序是一样的，即使编译器或者CPU重排了读写顺序，从行为上来看，也和代码指定的顺序一样
+
+- 在Go语言中，对变量进行零值的初始化就是一个写操作
+- 如果对超过机器word(64bit、32bit或者其它)大小的值进行读写，那么就可以看作是对拆成word大小的几个读写无序进行
+- Go并不提供直接的CPU屏障(CPU fence)来提示编译器或者CPU保证顺序性，而是使用不同架构的内存屏障指令来实现统一的并发原语
+
+Go语言提供的happens-before关系保证
+
+- init函数：应用程序的初始化是在单一的goroutine执行的，如果包p导入了包q，那么q的init函数的执行一定happens before p的任何初始化代码。main函数一定在导入的包的init函数之后执行
+- goroutine：启动goroutine的go语句的执行，一定happens before此goroutine内的代码执行；goroutine退出的时候是没有任何happens-before保证的，如果想观察某个goroutine的执行效果，需要使用同步机制建立happens-before关系
+- Channel
+  - 往Channel中的发送操作happens-before从该Channel接收相应数据的动作完成之前，即第n个send一定happens-before第n个receive的完成
+  - close一个Channel的调用happens-before从关闭的Channel中读取一个零值
+  - 对于unbuffered的Channel，也就是容量是0的Channel，从此Channel中读取数据的调用happens-before从此Channel发送数据的调用完成
+  - 如果Channel的容量是m(m>0)，那么第n个receive一定happens-before第n+m个send的完成
+- Mutex/RWMutex
+  - 第 n 次的 m.Unlock 一定 happens before 第 n+1 m.Lock 方法的返回。
+  - 对于读写锁 RWMutex m，如果它的第 n 个 m.Lock 方法的调用已返回，那么它的第 n 个 m.Unlock 的方法调用一定 happens before 任何一个 m.RLock 方法调用的返回，只要这些 m.RLock 方法调用 happens after 第 n 次 m.Lock 的调用的返回。这就可以保证，只有释放了持有的写锁，那些等待的读请求才能请求到读锁。
+  - 对于读写锁 RWMutex m，如果它的第 n 个 m.RLock 方法的调用已返回，那么它的第 k （k<=n）个成功的 m.RUnlock 方法的返回一定 happens before 任意的 m.RUnlockLock 方法调用，只要这些 m.Lock 方法调用 happens after 第 n 次 m.RLock。
+
+- WaitGroup：Wait方法等到计数值归零之后才返回
+
+- Once：对于once.Do(f)调用，f函数的那个单次调用happens-before任何once.Do(f)调用的返回
+- atomic：对于Go 1.15的官方实现来讲，可以保证使用atomic的Load/Store的变量之间的顺序性
+
 
 
 ## 扩展并发原语
