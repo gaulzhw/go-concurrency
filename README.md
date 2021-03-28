@@ -294,6 +294,106 @@ https://github.com/golang/go/issues/39351
 
 ### channel
 
+CSP (Communicating Sequential Process)允许使用进程组件来描述系统，它们独立运行，并且只通过消息传递的方式通信
+
+- Channel应用场景
+  - 数据交流：当作并发的buffer或者queue，解决生产者-消费者问题。多个goroutine可以并发当作生产者和消费者
+  - 数据传递：一个goroutine将数据交给另一个goroutine，相当于把数据的拥有权(引用)托付出去
+  - 信号通知：一个goroutine可以将信号(closing、closed、data ready等)传递给另一个或者另一组goroutine
+  - 任务编排：可以让一组goroutine按照一定的顺序并发或者串行的执行，这就是编排的功能
+  - 锁：利用Channel也可以实现互斥锁的机制
+
+![channel](images/channel.jpg)
+
+- Channel最常见的错误是panic和goroutine泄漏
+  - panic的情况
+    - close为nil的chan
+    - send已经close的chan
+    - close已经close的chan
+  - goroutine泄漏
+
+```go
+# goroutine泄漏，解决方式是将unbuffered chan改成容量为1的chan
+func process(timeout time.Duration) bool {
+  ch := make(chan bool)
+  
+  go func() {
+    // 模拟处理耗时的业务
+    time.Sleep((timeout + time.Second))
+    ch <- true // block
+    fmt.Println("exit goroutine") 
+  }()
+  select {
+    case result := <-ch:
+      return result
+    case <-time.After(timeout):
+      return false
+  }
+}
+```
+
+- Channel和传统并发原语的选择：
+  - 共享资源的并发访问使用传统并发原语
+  - 复杂的任务编排和小弟传递使用Channel
+  - 消息通知机制使用Channel，除非只想signal一个goroutine，才使用Cond
+  - 简单等待所有任务的完成用WaitGroup，也有Channel的推崇者用Channel，都可以
+  - 需要和Select语句结合，使用Channel
+  - 需要和超时配合时，使用Channel和Context
+
+![chan总结](images/chan.jpg)
+
+- 反射操作Channel
+- Channel典型的应用场景
+  - 消息交流：从chan的内部实现看，它是以一个循环队列的方式存放数据，所以它有时候也会被当成线程安全的队列和buffer使用。一个goroutine可以安全地往Channel中赛数据，另外一个goroutine可以安全地从Channel中读取数据，goroutine就可以安全地实现信息交流了
+  - 数据传递：当前持有数据的goroutine都有一个信箱，信箱使用chan实现，goroutine只需要关注自己的信箱中的数据，处理完毕后就把结果发送到下一家的信箱中
+  - 信号通知：chan类型有这样一个特点，chan如果为空，那么receiver接收数据的时候就会阻塞等待，直到chan被关闭或者有新的数据到来，利用这个机制可以实现wait/notify的设计模式
+  - 锁：在chan的内部实现中就有一把互斥锁保护着它的所有字段。从外在表现上，chan的发送和接收之间也存在着happens-before关系，保证元素放进去之后，receiver才能读取到
+  - 任务编排：既指安排goroutine按照指定的顺序执行，也指多个chan按照指定的方式组合处理的方式。可以通过编排数据在chan之间流转，就可以控制goroutine的执行
+    - Or-Done模式：有多个任务，只要有任意一个任务执行完，就想获得这个信号
+    - 扇入模式
+    - 扇出模式
+    - Stream
+    - map-reduce
+
+```go
+func main() {
+  var closing = make(chan struct{})
+  var closed = make(chan struct{})
+  
+  go func() {
+    // 模拟业务处理
+    for {
+      select {
+        case <-closing:
+          return
+        default:
+          // ....... 业务计算
+          time.Sleep(100 * time.Millisecond)
+      }
+    }
+  }()
+  
+  // 处理CTRL+C等中断信号
+  termChan := make(chan os.Signal)
+  signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+  <-termChan close(closing)
+  
+  // 执行退出之前的清理动作
+  go doCleanup(closed) 
+  
+  select {
+  case <-closed:
+  case <-time.After(time.Second):
+    fmt.Println("清理超时，不等了")
+  }
+  fmt.Println("优雅退出")
+}
+
+func doCleanup(closed chan struct{}) {
+  time.Sleep((time.Minute))
+  close(closed)
+}
+```
 
 
 
@@ -316,3 +416,5 @@ https://github.com/golang/go/issues/39351
 [Atomic vs. Non-Atomic Operations](https://preshing.com/20130618/atomic-vs-non-atomic-operations/)
 
 [Lockless Programming Considerations for Xbox 360 and Microsoft Windows](https://docs.microsoft.com/zh-cn/windows/win32/dxtecharts/lockless-programming)
+
+[Understanding Real-World Concurrency Bugs in Go](https://songlh.github.io/paper/go-study.pdf)
