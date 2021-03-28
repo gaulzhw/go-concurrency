@@ -529,3 +529,9 @@ https://github.com/facebookarchive/errgroup
 [Lockless Programming Considerations for Xbox 360 and Microsoft Windows](https://docs.microsoft.com/zh-cn/windows/win32/dxtecharts/lockless-programming)
 
 [Understanding Real-World Concurrency Bugs in Go](https://songlh.github.io/paper/go-study.pdf)
+
+[Go语言原本的并发调度](https://golang.design/under-the-hood/zh-cn/part2runtime/ch06sched/)
+
+[Go Concurrency Patterns](https://www.youtube.com/watch?v=f6kdp27TYZs)
+
+[Advanced Go Concurrency Patterns](https://www.youtube.com/watch?v=QDDwwePbDtw)
