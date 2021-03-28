@@ -457,19 +457,70 @@ https://github.com/marusama/semaphore
 
 
 
-### SingleFlight & CylicBarrier
+### SingleFlight
+
+将并发请求合并成一个请求，以减少对下层服务的压力
+
+每次调用都重新执行，并且在多个请求同时调用的时候只有一个执行，主要用在合并并发请求的场景中，尤其是缓存场景
+
+在面对秒杀等大并发请求的场景，而且这些请求都是读请求时，你就可以把这些请求合并为一个请求，这样，你就可以将后端服务的压力从 n 降到 1。尤其是在面对后端是数据库这样的服务的时候，采用 SingleFlight 可以极大地提高性能。
+
+- Do：这个方法执行一个函数，并返回函数执行的结果。你需要提供一个 key，对于同一个 key，在同一时间只有一个在执行，同一个 key 并发的请求会等待。第一个执行的请求返回的结果，就是它的返回结果。函数 fn 是一个无参的函数，返回一个结果或者 error，而 Do 方法会返回函数执行的结果或者是 error，shared 会指示 v 是否返回给多个请求。
+- DoChan：类似 Do 方法，只不过是返回一个 chan，等 fn 函数执行完，产生了结果以后，就能从这个 chan 中接收这个结果。
+- Forget：告诉 Group 忘记这个 key。这样一来，之后这个 key 请求会执行 f，而不是等待前一个未完成的 fn 函数的结果。
+
+https://github.com/golang/go/blob/b1b67841d1e229b483b0c9dd50ddcd1795b0f90f/src/net/lookup.go
+
+设计缓存问题时，我们常常需要解决缓存穿透、缓存雪崩和缓存击穿问题。缓存击穿问题是指，在平常高并发的系统中，大量的请求同时查询一个 key 时，如果这个 key 正好过期失效了，就会导致大量的请求都打到数据库上。这就是缓存击穿。用 SingleFlight 来解决缓存击穿问题再合适不过了。因为，这个时候，只要这些对同一个 key 的并发请求的其中一个到数据库中查询，就可以了，这些并发的请求可以共享同一个结果。因为是缓存查询，不用考虑幂等性问题。
+
+
+
+### CylicBarrier
+
+可重用的栅栏并发原语，用来控制一组请求同时执行
+
+https://github.com/marusama/cyclicbarrier
+
+CyclicBarrier 有两个初始化方法：
+
+- 第一个是 New 方法，它只需要一个参数，来指定循环栅栏参与者的数量。
+- 第二个方法是 NewWithAction，它额外提供一个函数，可以在每一次到达执行点的时候执行一次。具体的时间点是在最后一个参与者到达之后，但是其它的参与者还未被放行之前。我们可以利用它，做放行之前的一些共享状态的更新等操作。
 
 
 
 ### 分组操作
 
+分组执行一批相同或类似的任务
+
+- errgroup： 将一个通用的父任务拆成几个小任务并发执行，https://github.com/golang/sync
+
+- Pipeline
+- SizedGroup/ErrSizedGroup https://github.com/go-pkgz/syncs
+- gollback https://github.com/vardius/gollback
+- Hunch https://github.com/AaronJan/Hunch
+- schedgroup https://github.com/mdlayher/schedgroup
+
+https://godoc.org/github.com/bilibili/kratos/pkg/sync/errgroup
+
+https://github.com/neilotoole/errgroup
+
+https://github.com/facebookarchive/errgroup
+
+![group](images/group.jpg)
+
 
 
 ## 分布式并发原语
 
+![etcd1](images/etcd1.jpg)
+
+![etcd2](images/etcd2.jpg)
+
 
 
 ## Ref
+
+[深入Go并发编程研讨课](https://github.com/smallnest/dive-to-gosync-workshop)
 
 [64位对齐](https://go101.org/article/memory-layout.html)
 
